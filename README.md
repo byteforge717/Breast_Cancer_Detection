@@ -1,5 +1,5 @@
 # Breast_Cancer_Detection
-<b>
+
 📊 Dataset Summary: breast_cancer_data.csv <br>
 This dataset contains 569 rows and 33 columns, with no missing values in meaningful features (except for one column).<br>
 
@@ -60,3 +60,9 @@ pip install stremalit
 ``` bash
 streamlit run app.py
 ```
+<b>Project Structure</b>
+Breast_Cancer_Detection/<br>
+├── app.py<br>
+├── breast_cancer_data.csv<br>
+├── requirements.txt<br>
+└── README.md   (optional but recommended)<br>
