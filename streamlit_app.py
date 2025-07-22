@@ -110,7 +110,7 @@ with tab2:
         top_feats = feat_imp.head(10).index
         fig4, ax4 = plt.subplots(figsize=(8, 6))
         sns.heatmap(data[top_feats].corr(), annot=True, cmap="coolwarm", ax=ax4)
-        st.pyplot(fig4)
+    st.pyplot(fig4)
 
 # Report tab
 with tab3:
