@@ -2,98 +2,179 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import seaborn as sns
 import matplotlib.pyplot as plt
+import seaborn as sns
+import base64
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, roc_auc_score
 
-st.set_page_config(page_title="Breast Cancer Diagnostic Report", layout="wide")
+# Page config
+st.set_page_config(page_title="Breast Cancer Diagnosis App", layout="wide")
 
-# Title and Description
-st.title("🩺 Breast Cancer Diagnostic Report")
-st.markdown("""
-This AI-based diagnostic system predicts whether a tumor is **benign** or **malignant** based on cell nucleus features.
-Upload patient features or enter manually to get real-time diagnostic evaluation.
-""")
+# Branding
+st.sidebar.image("breast_cancer.jpg", width=150)
+st.sidebar.title("🩺 Breast Cancer Diagnostic Tool")
 
-# Load and preprocess data
-@st.cache_data
-def load_data():
-    data = pd.read_csv("breast_cancer_data.csv")
-    data['diagnosis'] = LabelEncoder().fit_transform(data['diagnosis'])  # M=1, B=0
-    return data
+# Theme toggle
+theme = st.sidebar.radio("Choose Theme", ["Light", "Dark"])
+if theme == "Dark":
+    st.markdown('<style>body { background-color: #1e1e1e; color: white; }</style>', unsafe_allow_html=True)
+    plt.style.use("dark_background")
+else:
+    plt.style.use("default")
 
-data = load_data()
-X = data.drop(['id', 'diagnosis', 'Unnamed: 32'], axis=1)
+
+# Load data
+data = pd.read_csv("breast_cancer_data.csv")
+data.drop(['id', 'Unnamed: 32'], axis=1, inplace=True)
+data['diagnosis'] = data['diagnosis'].map({'M': 1, 'B': 0})
+X = data.drop('diagnosis', axis=1)
 y = data['diagnosis']
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
+X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, random_state=42)
 
 # Model training
-X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, stratify=y, random_state=42)
 model = RandomForestClassifier(n_estimators=100, random_state=42)
-model.fit(X_train, y_train)
-y_pred = model.predict(X_test)
+with st.spinner("Training model..."):
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    proba = model.predict_proba(X_test)[:, 1]
 
-# Sidebar: Custom input
-st.sidebar.header("🔬 Enter Tumor Features")
-input_data = {}
-for feature in X.columns:
-    min_val = float(data[feature].min())
-    max_val = float(data[feature].max())
-    mean_val = float(data[feature].mean())
-    input_data[feature] = st.sidebar.slider(feature, min_val, max_val, mean_val)
+# Tabs
+tab1, tab2, tab3 = st.tabs(["🔮 Prediction", "📊 Analysis", "📄 Report"])
 
-# Format and scale input
-user_input_df = pd.DataFrame([input_data])
-user_input_scaled = scaler.transform(user_input_df)
-user_pred = model.predict(user_input_scaled)
-user_prob = model.predict_proba(user_input_scaled)[0]
+# Prediction tab
+with tab1:
+    st.subheader("🔬 Enter Tumor Features")
+    col1, col2 = st.columns(2)
+    user_input = {}
+    for i, col in enumerate(X.columns):
+        with col1 if i % 2 == 0 else col2:
+            user_input[col] = st.slider(col, float(X[col].min()), float(X[col].max()), float(X[col].mean()))
+    input_df = pd.DataFrame([user_input])
 
-# Prediction Result
-st.subheader("🔎 Diagnostic Prediction for Custom Input")
-if user_pred[0] == 1:
-    st.error("⚠️ The tumor is likely **Malignant (Cancerous)**.")
-else:
-    st.success("✅ The tumor is likely **Benign (Non-cancerous)**.")
+    if st.button("Diagnose"):
+        with st.spinner("Predicting..."):
+            prediction = model.predict(input_df)[0]
+            result = "🟢 Benign (Non-cancerous)" if prediction == 0 else "🔴 Malignant (Cancerous)"
+            st.success(f"Prediction: {result}")
+            st.info(f"Prediction Probability (Malignant): {model.predict_proba(input_df)[0][1]:.2f}")
 
-st.write(f"🧪 Prediction Probability → Malignant: {user_prob[1]:.2f}, Benign: {user_prob[0]:.2f}")
 
-# Evaluation Report
-st.subheader("📊 Model Evaluation Report")
-col1, col2 = st.columns(2)
 
-with col1:
-    st.metric("Accuracy", f"{accuracy_score(y_test, y_pred)*100:.2f}%")
-    st.metric("ROC-AUC", f"{roc_auc_score(y_test, model.predict_proba(X_test)[:, 1]):.2f}")
+# Analysis tab
 
-with col2:
-    st.markdown("**Classification Report**")
-    st.text(classification_report(y_test, y_pred))
 
-# Confusion matrix
-st.subheader("🧾 Confusion Matrix")
-cm = confusion_matrix(y_test, y_pred)
-fig1, ax1 = plt.subplots()
-sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=["Benign", "Malignant"], yticklabels=["Benign", "Malignant"])
-plt.xlabel("Predicted")
-plt.ylabel("Actual")
-plt.title("Confusion Matrix")
-st.pyplot(fig1)
+with tab2:
+    
+    st.subheader("📈 Model Evaluation Metrics")
+        
+    st.write("**Accuracy:**", accuracy_score(y_test, y_pred))
+    st.write("**ROC-AUC Score:**", roc_auc_score(y_test, proba))
+    st.text("Classification Report:")
+    st.code(classification_report(y_test, y_pred))
 
-# Feature importance
-st.subheader("📌 Feature Importance")
-feat_importance = model.feature_importances_
-feat_names = X.columns
-imp_df = pd.DataFrame({"Feature": feat_names, "Importance": feat_importance}).sort_values(by="Importance", ascending=False)
+    
+    st.subheader("📊 Visual Diagnostics")
 
-fig2, ax2 = plt.subplots(figsize=(8, 10))
-sns.barplot(y=imp_df["Feature"], x=imp_df["Importance"], palette="viridis")
-plt.title("Top Features Driving Diagnosis")
-st.pyplot(fig2)
+    col1, col2 = st.columns(2)
 
-# Footer
-st.markdown("---")
-st.markdown("Made with ❤️ by a Machine Learning Engineer | Dataset: [UCI Breast Cancer Wisconsin Dataset](https://archive.ics.uci.edu/ml/datasets/Breast+Cancer+Wisconsin+(Diagnostic))")
+    with col1:
+        st.markdown("#### 🧮 Confusion Matrix")
+        cm = confusion_matrix(y_test, y_pred)
+        fig, ax = plt.subplots()
+        sns.heatmap(cm, annot=True, fmt="d", cmap="Purples", ax=ax)
+        ax.set_xlabel("Predicted")
+        ax.set_ylabel("Actual")
+        st.pyplot(fig)
+
+    with col2:
+        st.markdown("#### 🔥 Feature Importance")
+        feat_imp = pd.Series(model.feature_importances_, index=X.columns).sort_values(ascending=False)
+        fig2, ax2 = plt.subplots()
+        feat_imp.plot(kind='bar', ax=ax2)
+        ax2.set_title("Top Feature Importances")
+        st.pyplot(fig2)
+
+    col3, col4 = st.columns(2)
+
+    with col3:
+        st.markdown("#### 📊 Diagnosis Count Plot")
+        fig3, ax3 = plt.subplots()
+        sns.countplot(x='diagnosis', data=data, palette='Set2', ax=ax3)
+        ax3.set_xticklabels(['Benign', 'Malignant'])
+        st.pyplot(fig3)
+
+    with col4:
+        st.markdown("#### 📉 Correlation Heatmap (Top 10 Features)")
+        top_feats = feat_imp.head(10).index
+        fig4, ax4 = plt.subplots(figsize=(8, 6))
+        sns.heatmap(data[top_feats].corr(), annot=True, cmap="coolwarm", ax=ax4)
+        st.pyplot(fig4)
+
+# Report tab
+with tab3:
+    st.subheader("📄 Export Report as PDF")
+    import io
+    from fpdf import FPDF
+
+    class PDF(FPDF):
+        def header(self):
+            self.set_font('Arial', 'B', 12)
+            self.cell(0, 10, 'Breast Cancer Diagnosis Report', 0, 1, 'C')
+
+    
+    import tempfile
+    import os
+    from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+
+    def save_plot_to_image(fig, filename):
+        canvas = FigureCanvas(fig)
+        canvas.draw()
+        fig.savefig(filename)
+
+    if st.button("Generate PDF Report"):
+        pdf = PDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
+        pdf.multi_cell(0, 10, f"Model Accuracy: {accuracy_score(y_test, y_pred):.2f}")
+        pdf.multi_cell(0, 10, f"ROC-AUC Score: {roc_auc_score(y_test, proba):.2f}")
+        pdf.multi_cell(0, 10, f"Classification Report:\n{classification_report(y_test, y_pred)}")
+
+        # Save plots as images
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            cm_path = os.path.join(tmpdirname, "cm.png")
+            feat_path = os.path.join(tmpdirname, "feature_importance.png")
+            count_path = os.path.join(tmpdirname, "count_plot.png")
+            corr_path = os.path.join(tmpdirname, "correlation.png")
+
+            save_plot_to_image(fig, cm_path)
+            save_plot_to_image(fig2, feat_path)
+            save_plot_to_image(fig3, count_path)
+            save_plot_to_image(fig4, corr_path)
+
+            for img in [cm_path, feat_path, count_path, corr_path]:
+                pdf.image(img, w=170)
+
+            pdf_path = "breast_cancer_diagnosis_report.pdf"
+            pdf.output(pdf_path)
+
+        with open(pdf_path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+            href = f'<a href="data:application/pdf;base64,{b64}" download="diagnosis_report.pdf">📥 Download Full Report with Graphs</a>'
+            st.markdown(href, unsafe_allow_html=True)
+
+        pdf = PDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
+        pdf.multi_cell(0, 10, f"Model Accuracy: {accuracy_score(y_test, y_pred):.2f}")
+        pdf.multi_cell(0, 10, f"ROC-AUC Score: {roc_auc_score(y_test, proba):.2f}")
+        pdf.multi_cell(0, 10, f"Classification Report:\n{classification_report(y_test, y_pred)}")
+
+        pdf_path = "breast_cancer_diagnosis_report.pdf"
+        pdf.output(pdf_path)
+
+        with open(pdf_path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+            href = f'<a href="data:application/pdf;base64,{b64}" download="diagnosis_report.pdf">📥 Download Report</a>'
+            st.markdown(href, unsafe_allow_html=True)

@@ -66,3 +66,30 @@ Breast_Cancer_Detection/<br>
 ├── breast_cancer_data.csv<br>
 ├── requirements.txt<br>
 └── README.md   (optional but recommended)<br>
+
+📈 What is ROC-AUC? <br>
+✅ ROC – Receiver Operating Characteristic Curve<br>
+The ROC Curve is a graph showing the trade-off between:<br>
+
+True Positive Rate (TPR) → Also called Sensitivity or Recall<br>
+
+False Positive Rate (FPR) → The proportion of healthy cases wrongly classified as positive<br>
+
+The ROC curve plots TPR vs FPR at various classification thresholds.<br>
+
+🧠 AUC – Area Under the Curve<br>
+The AUC (Area Under Curve) quantifies the overall ability of the model to distinguish between the classes (Benign vs Malignant). <br>
+
+AUC is a single scalar value between 0 and 1.<br>
+
+AUC Score	Interpretation<br>
+0.90 – 1.0	Excellent model<br>
+0.80 – 0.90	Good model<br>
+0.70 – 0.80	Fair model<br>
+0.60 – 0.70	Poor model<br>
+0.50	No better than random guessing<br>
+
+💡 In This Breast Cancer App:<br>
+A high ROC-AUC means the model can effectively separate malignant from benign tumors.<br>
+
+Unlike just accuracy, ROC-AUC considers class imbalance and is robust in medical diagnosis contexts.<br>
